@@ -18,7 +18,8 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3 python3-pip zip unzip
+        sudo apt-get install -y git
+        sudo apt-get install -y python3 python3-pip zip unzip git
         sudo pip3 install --upgrade pip
 
         # مهم: نصب buildozer در /usr/local/bin
