@@ -1,4 +1,4 @@
-name: Build APK
+name: Build APK with Docker
 
 on: [workflow_dispatch]
 
@@ -7,20 +7,21 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Install dependencies
+    # Step 1: دانلود کد
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    # Step 2: ساخت با Docker (همه چیز داخل Docker هست)
+    - name: 🐳 Build APK using Docker
       run: |
-        sudo apt update
-        sudo apt install -y python3-pip python3-venv openjdk-17-jdk
-        pip3 install buildozer cython
-        
-    - name: Build APK
-      run: |
-        buildozer android debug
-        
-    - name: Upload APK
+        docker run --rm \
+          -v "$(pwd)":/src \
+          -v buildozer-cache:/root/.buildozer \
+          kivy/buildozer android debug
+          
+    # Step 3: آپلود APK
+    - name: 📤 Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: telegram-app
+        name: telegram-bot-apk
         path: bin/*.apk
