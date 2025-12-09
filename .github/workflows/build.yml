@@ -1,37 +1,111 @@
-name: Build APK
+name: Build APK with Debug
 
-on:
-  workflow_dispatch:
-  push:
-    branches: [main]
+on: [workflow_dispatch]
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     
     steps:
     - uses: actions/checkout@v4
     
-    - name: Setup environment
+    - name: Install system dependencies
       run: |
         sudo apt update
-        sudo apt install -y python3-pip python3-venv openjdk-17-jdk git zip unzip
-        pip3 install buildozer cython
+        sudo apt install -y \
+          python3-pip \
+          python3-venv \
+          openjdk-17-jdk \
+          git \
+          zip \
+          unzip \
+          libffi-dev \
+          libssl-dev \
+          zlib1g-dev
         
-    - name: Accept Android licenses
+    - name: Install Buildozer
       run: |
-        mkdir -p ~/.android/licenses
-        echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > ~/.android/licenses/android-sdk-license
-        echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> ~/.android/licenses/android-sdk-license
-        echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" >> ~/.android/licenses/android-sdk-license
+        pip3 install --upgrade pip
+        pip3 install buildozer cython==0.29.36
         
-    - name: Build APK
+    - name: Create minimal buildozer.spec
       run: |
-        buildozer android debug
+        # اگر buildozer.spec نداریم، ایجادش می‌کنیم
+        if [ ! -f buildozer.spec ]; then
+          cat > buildozer.spec << 'EOF'
+[app]
+title = Telegram Bot
+package.name = telegrambot
+package.domain = com.example
+version = 1.0.0
+version.code = 1
+source.dir = .
+source.main = main.py
+requirements = python3, kivy==2.1.0
+orientation = portrait
+fullscreen = 0
+android.permissions = INTERNET
+android.minapi = 21
+android.targetapi = 33
+android.archs = arm64-v8a
+p4a.bootstrap = sdl2
+android.accept_sdk_license = True
+
+[buildozer]
+log_level = 2
+warn_on_root = 1
+EOF
+        fi
+        
+        # نمایش محتوا برای بررسی
+        echo "=== Current buildozer.spec ==="
+        cat buildozer.spec
+        
+    - name: Build with full logs
+      run: |
+        echo "=== Starting Build Process ==="
+        echo "Date: $(date)"
+        
+        # پاکسازی قبلی
+        rm -rf .buildozer bin 2>/dev/null || true
+        
+        # ساخت با log کامل
+        buildozer -v android debug 2>&1 | tee full_build.log
+        
+        # بررسی خطاها
+        if find bin/ -name "*.apk" 2>/dev/null | grep -q .; then
+          echo "✅ SUCCESS: APK created!"
+          APK_FILE=$(find bin/ -name "*.apk" | head -1)
+          echo "File: $APK_FILE"
+          ls -lh "$APK_FILE"
+        else
+          echo "❌ FAILED: No APK created"
+          echo "=== ERROR ANALYSIS ==="
+          
+          # استخراج خطاها
+          echo "1. Looking for common errors..."
+          grep -i -B 5 -A 5 "error\|Error\|ERROR" full_build.log | head -100
+          
+          echo "2. Checking for missing dependencies..."
+          grep -i "not found\|missing\|no module" full_build.log | head -50
+          
+          echo "3. Last 100 lines of log..."
+          tail -100 full_build.log
+          
+          exit 1
+        fi
         
     - name: Upload APK
       if: success()
       uses: actions/upload-artifact@v4
       with:
-        name: telegram-app
+        name: telegram-apk
         path: bin/*.apk
+        
+    - name: Upload full log
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-logs
+        path: full_build.log
