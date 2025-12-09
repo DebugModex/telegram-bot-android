@@ -1,38 +1,75 @@
-name: Build APK Debug
+name: Build Telegram Bot APK
 
 on: [workflow_dispatch]
 
 jobs:
   build:
     runs-on: ubuntu-22.04
+    timeout-minutes: 90
     
     steps:
     - uses: actions/checkout@v4
     
-    - name: Install
+    - name: Cache Android SDK/NDK
+      uses: actions/cache@v3
+      id: cache
+      with:
+        path: |
+          ~/.buildozer
+          ~/.android
+          ~/.gradle
+        key: ${{ runner.os }}-android-sdk-${{ hashFiles('buildozer.spec') }}
+        restore-keys: |
+          ${{ runner.os }}-android-sdk-
+    
+    - name: Setup environment
       env:
         DEBIAN_FRONTEND: noninteractive
+        TZ: UTC
       run: |
         sudo apt-get update
         sudo apt-get install -y python3 python3-pip openjdk-17-jdk-headless
         pip3 install buildozer cython
         
-    - name: Build and capture errors
+    - name: Accept Android licenses
       run: |
-        # ساخت و ذخیره خروجی
-        echo y | buildozer android debug 2>&1 | tee output.txt
+        mkdir -p ~/.android
+        yes | /usr/lib/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
         
-        # استخراج آخرین خطوط در صورت خطا
-        if [ $? -ne 0 ]; then
-          echo "=== LAST 100 LINES ==="
-          tail -100 output.txt
-          echo "=== ERRORS ==="
-          grep -i "error\|failed\|exception" output.txt | tail -20
+    - name: Build APK
+      run: |
+        echo "🚀 Starting build process..."
+        echo "First time: 45-60 minutes"
+        echo "With cache: 10-15 minutes"
+        
+        echo y | buildozer android debug
+        
+    - name: Find and prepare APK
+      run: |
+        # پیدا کردن APK
+        APK_FILE=$(find . -name "*.apk" -type f | head -1)
+        
+        if [ -z "$APK_FILE" ]; then
+          echo "❌ No APK found. Searching in .buildozer..."
+          APK_FILE=$(find .buildozer -name "*.apk" -type f | head -1)
+        fi
+        
+        if [ -n "$APK_FILE" ]; then
+          echo "✅ APK found: $APK_FILE"
+          # ایجاد پوشه bin و کپی
+          mkdir -p bin
+          cp "$APK_FILE" bin/app-debug.apk
+          echo "Size: $(du -h bin/app-debug.apk | cut -f1)"
+        else
+          echo "❌ ERROR: Build completed but no APK found!"
+          echo "Listing .buildozer directory:"
+          find .buildozer -type f -name "*.apk" 2>/dev/null
           exit 1
         fi
         
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: app
-        path: bin/*.apk
+        name: telegram-bot-apk
+        path: bin/app-debug.apk
+        if-no-files-found: error
