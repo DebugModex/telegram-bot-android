@@ -2,21 +2,30 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
   workflow_dispatch:  # اجازه اجرای دستی
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
-  build:
+  build-android:
+    name: Build Android APK
     runs-on: ubuntu-latest
+    timeout-minutes: 90  # افزایش زمان برای دانلود SDK
     
     steps:
-    - name: 📥 Checkout code
+    - name: 📥 Checkout repository
       uses: actions/checkout@v4
       
-    - name: 🐍 Setup Python
-      uses: actions/setup-python@v4
+    - name: 🐍 Set up Python 3.11
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
+        cache: 'pip'
         
     - name: 📦 Install system dependencies
       run: |
@@ -27,37 +36,82 @@ jobs:
           unzip \
           openjdk-17-jdk \
           python3-pip \
-          python3-setuptools
+          python3-setuptools \
+          python3-venv \
+          libffi-dev \
+          libssl-dev \
+          libxml2-dev \
+          libxslt1-dev \
+          libjpeg-dev \
+          libz-dev
         
-    - name: 🔧 Install Buildozer
+    - name: 🔧 Install Buildozer and dependencies
       run: |
-        pip install --upgrade pip
-        pip install buildozer cython==0.29.36
+        python -m pip install --upgrade pip
+        pip install buildozer cython==0.29.36 virtualenv
         
-    - name: 🏗️ Build APK
+    - name: ⚙️ Configure Buildozer
       run: |
-        echo "Starting APK build..."
+        # Initialize buildozer if spec file doesn't exist
+        if [ ! -f buildozer.spec ]; then
+          buildozer init
+          echo "buildozer.spec created"
+        fi
+        
+        # Update buildozer.spec with minimal requirements
+        if [ -f buildozer.spec ]; then
+          # Make backup
+          cp buildozer.spec buildozer.spec.backup
+          
+          # Ensure required settings
+          sed -i "s|^requirements = .*|requirements = python3,kivy==2.1.0,requests,pillow|g" buildozer.spec || true
+          sed -i "s|^android.minapi = .*|android.minapi = 21|g" buildozer.spec || true
+          sed -i "s|^android.accept_sdk_license = .*|android.accept_sdk_license = True|g" buildozer.spec || true
+          sed -i "s|^p4a.bootstrap = .*|p4a.bootstrap = sdl2|g" buildozer.spec || true
+          
+          echo "buildozer.spec updated"
+        fi
+        
+    - name: 🏗️ Build APK (Debug)
+      run: |
+        echo "Starting APK build process..."
+        echo "This may take 30-60 minutes..."
+        
+        # Clean previous builds
+        rm -rf .buildozer bin || true
+        
+        # Build with verbose logging
         buildozer android debug 2>&1 | tee build.log
         
-        # Check if APK was created
-        if ls bin/*.apk 1> /dev/null 2>&1; then
-          echo "✅ APK build successful!"
+        # Check result
+        if [ -f "bin/*.apk" ] || [ -f "bin/app-debug.apk" ] || [ -f "bin/*debug*.apk" ]; then
+          echo "✅ APK build SUCCESSFUL!"
+          ls -la bin/
         else
-          echo "❌ APK build failed!"
-          cat build.log
+          echo "❌ APK build FAILED!"
+          echo "=== Last 100 lines of build.log ==="
+          tail -100 build.log
+          echo "=== Checking for common errors ==="
+          grep -i "error\|failed\|exception" build.log | head -20
           exit 1
         fi
         
     - name: 📤 Upload APK artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
+      if: success()
       with:
         name: telegram-bot-apk
-        path: bin/*.apk
+        path: |
+          bin/*.apk
+          bin/
         retention-days: 90
         
-    - name: 📋 Upload build log
-      uses: actions/upload-artifact@v3
+    - name: 📋 Upload build logs
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: build-logs
-        path: build.log
+        path: |
+          build.log
+          .buildozer/
+        retention-days: 30
