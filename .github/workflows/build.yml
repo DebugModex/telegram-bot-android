@@ -19,16 +19,13 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y python3 python3-pip zip unzip
-        pip3 install --upgrade pip
-        pip3 install buildozer cython sh jinja2
+        sudo pip3 install --upgrade pip
 
-        # مهم: Buildozer اینجا نصب می‌شود، پس باید این مسیر به PATH برود
-        echo 'export PATH=$HOME/.local/bin:$PATH' >> ~/.bashrc
+        # مهم: نصب buildozer در /usr/local/bin
+        sudo pip3 install buildozer cython sh jinja2
 
     - name: Install Android SDK / cmdline-tools
       run: |
-        export PATH=$HOME/.local/bin:$PATH
-
         mkdir -p $HOME/android-sdk/cmdline-tools
         cd $HOME/android-sdk/cmdline-tools
 
@@ -47,7 +44,7 @@ jobs:
         ANDROIDSDK: $HOME/android-sdk
         ANDROID_HOME: $HOME/android-sdk
         ANDROIDNDK: $HOME/android-sdk/ndk/25.1.8937393
-        PATH: $HOME/.local/bin:$HOME/android-sdk/cmdline-tools/latest/bin:$HOME/android-sdk/platform-tools:$PATH
+        PATH: /usr/local/bin:$HOME/android-sdk/cmdline-tools/latest/bin:$HOME/android-sdk/platform-tools:$PATH
       run: |
         buildozer android debug
 
