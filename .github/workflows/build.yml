@@ -1,111 +1,36 @@
-name: Build APK with Debug
+name: Build APK
 
 on: [workflow_dispatch]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
     
     steps:
     - uses: actions/checkout@v4
     
-    - name: Install system dependencies
+    - name: Install dependencies
       run: |
         sudo apt update
-        sudo apt install -y \
-          python3-pip \
-          python3-venv \
-          openjdk-17-jdk \
-          git \
-          zip \
-          unzip \
-          libffi-dev \
-          libssl-dev \
-          zlib1g-dev
+        sudo apt install -y python3-pip openjdk-17-jdk
+        pip3 install buildozer
         
-    - name: Install Buildozer
+    - name: Build APK
       run: |
-        pip3 install --upgrade pip
-        pip3 install buildozer cython==0.29.36
+        buildozer android debug
         
-    - name: Create minimal buildozer.spec
+    - name: Check if APK exists
       run: |
-        # اگر buildozer.spec نداریم، ایجادش می‌کنیم
-        if [ ! -f buildozer.spec ]; then
-          cat > buildozer.spec << 'EOF'
-[app]
-title = Telegram Bot
-package.name = telegrambot
-package.domain = com.example
-version = 1.0.0
-version.code = 1
-source.dir = .
-source.main = main.py
-requirements = python3, kivy==2.1.0
-orientation = portrait
-fullscreen = 0
-android.permissions = INTERNET
-android.minapi = 21
-android.targetapi = 33
-android.archs = arm64-v8a
-p4a.bootstrap = sdl2
-android.accept_sdk_license = True
-
-[buildozer]
-log_level = 2
-warn_on_root = 1
-EOF
-        fi
-        
-        # نمایش محتوا برای بررسی
-        echo "=== Current buildozer.spec ==="
-        cat buildozer.spec
-        
-    - name: Build with full logs
-      run: |
-        echo "=== Starting Build Process ==="
-        echo "Date: $(date)"
-        
-        # پاکسازی قبلی
-        rm -rf .buildozer bin 2>/dev/null || true
-        
-        # ساخت با log کامل
-        buildozer -v android debug 2>&1 | tee full_build.log
-        
-        # بررسی خطاها
-        if find bin/ -name "*.apk" 2>/dev/null | grep -q .; then
-          echo "✅ SUCCESS: APK created!"
-          APK_FILE=$(find bin/ -name "*.apk" | head -1)
-          echo "File: $APK_FILE"
-          ls -lh "$APK_FILE"
+        if ls bin/*.apk 1> /dev/null 2>&1; then
+          echo "✅ APK created successfully"
+          ls -lh bin/*.apk
         else
-          echo "❌ FAILED: No APK created"
-          echo "=== ERROR ANALYSIS ==="
-          
-          # استخراج خطاها
-          echo "1. Looking for common errors..."
-          grep -i -B 5 -A 5 "error\|Error\|ERROR" full_build.log | head -100
-          
-          echo "2. Checking for missing dependencies..."
-          grep -i "not found\|missing\|no module" full_build.log | head -50
-          
-          echo "3. Last 100 lines of log..."
-          tail -100 full_build.log
-          
+          echo "❌ No APK found"
           exit 1
         fi
         
     - name: Upload APK
-      if: success()
       uses: actions/upload-artifact@v4
       with:
-        name: telegram-apk
+        name: telegram-app
         path: bin/*.apk
-        
-    - name: Upload full log
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-logs
-        path: full_build.log
