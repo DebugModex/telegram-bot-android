@@ -1,29 +1,26 @@
 [app]
-title = Telegram Bot Pro
-package.name = telegrambotpro
-package.domain = com.telegram
+title = Telegram Bot
+package.name = mytelegramapp
+package.domain = com.example
 version = 1.0.0
 version.code = 1
 
 source.dir = .
 source.main = main.py
 
-# فقط این دو کتابخانه - ❌ بدون pillow
 requirements = python3, kivy==2.1.0, requests
 
 orientation = portrait
 fullscreen = 0
 
-android.permissions = INTERNET, WRITE_EXTERNAL_STORAGE, READ_EXTERNAL_STORAGE
+android.permissions = INTERNET
 
 android.minapi = 21
 android.targetapi = 33
-android.archs = arm64-v8a  # فقط یک معماری
+android.archs = arm64-v8a
 
 p4a.bootstrap = sdl2
 android.accept_sdk_license = True
-android.allow_backup = True
-android.usesCleartextTraffic = True
 
 [buildozer]
 log_level = 2
