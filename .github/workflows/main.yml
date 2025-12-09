@@ -1,0 +1,27 @@
+name: Find APK
+
+on: [workflow_dispatch]
+
+jobs:
+  find:
+    runs-on: ubuntu-22.04
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Explore build directory
+      run: |
+        echo "=== Searching for APK files ==="
+        echo "Searching in current directory..."
+        find . -name "*.apk" 2>/dev/null
+        
+        echo ""
+        echo "Searching in .buildozer..."
+        find .buildozer -name "*.apk" 2>/dev/null
+        
+        echo ""
+        echo "=== Directory structure ==="
+        ls -la
+        echo ""
+        echo "=== .buildozer structure ==="
+        find .buildozer -type d 2>/dev/null | head -30
