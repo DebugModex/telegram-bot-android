@@ -1,4 +1,4 @@
-name: Build Telegram Bot APK
+name: Build APK
 
 on: [workflow_dispatch]
 
@@ -9,28 +9,18 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Setup Python virtual environment
+    - name: Install everything
       run: |
-        # ایجاد virtual environment
-        python3 -m venv venv
-        source venv/bin/activate
+        sudo apt update
+        sudo apt install -y python3.11 python3.11-venv python3-distutils openjdk-17-jdk
+        python3.11 -m pip install buildozer
         
-        # نصب buildozer در محیط مجازی
-        pip install buildozer cython
-        
-    - name: Build APK
+    - name: Build
       run: |
-        source venv/bin/activate
-        
-        # غیرفعال کردن prompts
-        export BUILD_PATH=$(pwd)
-        export DEBIAN_FRONTEND=noninteractive
-        
-        # ساخت با پاسخ خودکار
         echo y | buildozer android debug
         
-    - name: Upload APK
+    - name: Upload
       uses: actions/upload-artifact@v4
       with:
-        name: telegram-bot
+        name: app
         path: bin/*.apk
