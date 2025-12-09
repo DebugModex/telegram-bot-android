@@ -1,4 +1,4 @@
-name: Build APK with Docker
+name: Build Telegram Bot APK
 
 on: [workflow_dispatch]
 
@@ -7,21 +7,59 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    # Step 1: دانلود کد
-    - name: 📥 Checkout code
-      uses: actions/checkout@v4
-      
-    # Step 2: ساخت با Docker (همه چیز داخل Docker هست)
-    - name: 🐳 Build APK using Docker
+    - uses: actions/checkout@v4
+    
+    - name: Build using Docker
       run: |
+        # ایجاد فایل buildozer.spec اگر وجود ندارد
+        if [ ! -f buildozer.spec ]; then
+          cat > buildozer.spec << 'EOF'
+[app]
+title = Telegram Bot
+package.name = telegrambot$(date +%s)
+package.domain = com.example
+version = 1.0.0
+version.code = 1
+source.dir = .
+source.main = main.py
+requirements = python3, kivy==2.1.0
+orientation = portrait
+fullscreen = 0
+android.permissions = INTERNET
+android.minapi = 21
+android.targetapi = 33
+android.archs = arm64-v8a
+p4a.bootstrap = sdl2
+android.accept_sdk_license = True
+
+[buildozer]
+log_level = 1
+warn_on_root = 0
+EOF
+        fi
+        
+        # اجرای build با yes برای تأیید خودکار
         docker run --rm \
           -v "$(pwd)":/src \
-          -v buildozer-cache:/root/.buildozer \
-          kivy/buildozer android debug
+          -v "$(pwd)/.buildozer":/root/.buildozer \
+          kivy/buildozer bash -c "yes | buildozer -v android debug 2>&1 | tee build.log"
           
-    # Step 3: آپلود APK
-    - name: 📤 Upload APK
+    - name: Check result
+      run: |
+        if ls bin/*.apk 1> /dev/null 2>&1; then
+          echo "✅ SUCCESS! APK created."
+          ls -lh bin/*.apk
+        else
+          echo "❌ FAILED!"
+          if [ -f "build.log" ]; then
+            echo "=== Last 50 lines of build.log ==="
+            tail -50 build.log
+          fi
+          exit 1
+        fi
+        
+    - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: telegram-bot-apk
+        name: telegram-app
         path: bin/*.apk
