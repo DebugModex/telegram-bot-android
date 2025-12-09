@@ -1,67 +1,44 @@
-name: Build Telegram Bot APK
+name: Build APK
 
-on:
-  workflow_dispatch:
-  push:
-    branches: [main]
+on: [workflow_dispatch]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
     
     steps:
     - uses: actions/checkout@v4
     
-    - name: Create buildozer.spec
+    - name: Create spec file
       run: |
-        cat > buildozer.spec << 'EOF'
-[app]
-title = Telegram Account Creator
-package.name = telegramaccountcreator
-package.domain = com.telegram.bot
-version = 1.0.0
-version.code = 1
-source.dir = .
-source.main = main.py
-requirements = python3, kivy==2.1.0, requests
-orientation = portrait
-fullscreen = 0
-android.permissions = INTERNET, WRITE_EXTERNAL_STORAGE, READ_EXTERNAL_STORAGE
-android.minapi = 21
-android.targetapi = 33
-android.archs = arm64-v8a
-p4a.bootstrap = sdl2
-android.accept_sdk_license = True
-android.allow_backup = True
-android.usesCleartextTraffic = True
-
-[buildozer]
-log_level = 1
-warn_on_root = 0
-EOF
+        echo "[app]" > buildozer.spec
+        echo "title = Telegram Bot" >> buildozer.spec
+        echo "package.name = telegrambot" >> buildozer.spec
+        echo "package.domain = com.example" >> buildozer.spec
+        echo "version = 1.0.0" >> buildozer.spec
+        echo "version.code = 1" >> buildozer.spec
+        echo "source.dir = ." >> buildozer.spec
+        echo "source.main = main.py" >> buildozer.spec
+        echo "requirements = python3, kivy==2.1.0, requests" >> buildozer.spec
+        echo "orientation = portrait" >> buildozer.spec
+        echo "fullscreen = 0" >> buildozer.spec
+        echo "android.permissions = INTERNET" >> buildozer.spec
+        echo "android.minapi = 21" >> buildozer.spec
+        echo "android.targetapi = 33" >> buildozer.spec
+        echo "android.archs = arm64-v8a" >> buildozer.spec
+        echo "p4a.bootstrap = sdl2" >> buildozer.spec
+        echo "android.accept_sdk_license = True" >> buildozer.spec
+        echo "" >> buildozer.spec
+        echo "[buildozer]" >> buildozer.spec
+        echo "log_level = 1" >> buildozer.spec
+        echo "warn_on_root = 0" >> buildozer.spec
         
     - name: Build with Docker
       run: |
-        docker run --rm \
-          -v "$(pwd)":/src \
-          -v "$(pwd)/.buildozer":/root/.buildozer \
-          kivy/buildozer bash -c "cd /src && buildozer android debug"
+        docker run --rm -v $(pwd):/src kivy/buildozer android debug
           
-    - name: Check result
-      run: |
-        if find bin/ -name "*.apk" 2>/dev/null | grep -q .; then
-          echo "✅ BUILD SUCCESSFUL!"
-          APK_FILE=$(find bin/ -name "*.apk" | head -1)
-          echo "APK: $APK_FILE"
-          ls -lh "$APK_FILE"
-        else
-          echo "❌ BUILD FAILED"
-          exit 1
-        fi
-        
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: telegram-bot-apk
+        name: telegram-app
         path: bin/*.apk
