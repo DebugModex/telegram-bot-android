@@ -9,21 +9,26 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Build using alternative Docker image
+    - name: Setup Python virtual environment
       run: |
-        # استفاده از image متفاوت که root warning ندارد
-        docker run --rm \
-          -v $(pwd):/src \
-          -e "P4A_RELEASE_KEYSTORE=/src/keystore.keystore" \
-          -e "P4A_RELEASE_KEYALIAS=key" \
-          beevelop/cordova bash -c "
-          cd /src &&
-          apt-get update &&
-          apt-get install -y python3-pip &&
-          pip3 install buildozer &&
-          echo y | buildozer android debug
-          "
-          
+        # ایجاد virtual environment
+        python3 -m venv venv
+        source venv/bin/activate
+        
+        # نصب buildozer در محیط مجازی
+        pip install buildozer cython
+        
+    - name: Build APK
+      run: |
+        source venv/bin/activate
+        
+        # غیرفعال کردن prompts
+        export BUILD_PATH=$(pwd)
+        export DEBIAN_FRONTEND=noninteractive
+        
+        # ساخت با پاسخ خودکار
+        echo y | buildozer android debug
+        
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
