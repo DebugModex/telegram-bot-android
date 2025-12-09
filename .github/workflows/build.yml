@@ -1,4 +1,4 @@
-name: Build Telegram Bot APK
+name: Build APK
 
 on:
   workflow_dispatch:
@@ -8,82 +8,30 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 100
     
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Setup Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-        
-    - name: Install dependencies
+    - uses: actions/checkout@v4
+    
+    - name: Setup environment
       run: |
         sudo apt update
-        sudo apt install -y git zip unzip openjdk-17-jdk python3-pip python3-venv autoconf automake libtool pkg-config libffi-dev libssl-dev libjpeg-dev zlib1g-dev
-        
-    - name: Install Buildozer
-      run: |
-        pip install --upgrade pip
-        pip install buildozer cython==0.29.36
+        sudo apt install -y python3-pip python3-venv openjdk-17-jdk git zip unzip
+        pip3 install buildozer cython
         
     - name: Accept Android licenses
       run: |
-        mkdir -p ~/.android
+        mkdir -p ~/.android/licenses
         echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > ~/.android/licenses/android-sdk-license
         echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> ~/.android/licenses/android-sdk-license
         echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" >> ~/.android/licenses/android-sdk-license
         
-    - name: Clean previous builds
-      run: |
-        rm -rf .buildozer 2>/dev/null || true
-        rm -rf bin 2>/dev/null || true
-        
     - name: Build APK
       run: |
-        echo "=== Starting Build Process ==="
-        echo "Time: $(date)"
-        
-        # مرحله 1: دانلود SDK
-        echo "Step 1: Downloading Android SDK..."
-        timeout 1500 buildozer android update 2>&1 | tee update.log || echo "Update phase completed"
-        
-        # مرحله 2: ساخت APK
-        echo "Step 2: Building APK..."
-        buildozer -v android debug 2>&1 | tee build.log
-        
-        # بررسی نتیجه
-        if find bin/ -name "*.apk" 2>/dev/null | grep -q .; then
-          echo "✅✅✅ BUILD SUCCESSFUL! ✅✅✅"
-          APK_FILE=$(find bin/ -name "*.apk" | head -1)
-          echo "APK: $APK_FILE"
-          ls -lh "$APK_FILE"
-          echo "Size: $(du -h "$APK_FILE" | cut -f1)"
-        else
-          echo "❌❌❌ BUILD FAILED ❌❌❌"
-          echo "=== Error Summary ==="
-          grep -i "error\|failed\|exception\|autoreconf\|autoconf" build.log | head -20
-          echo "=== Last 50 lines ==="
-          tail -50 build.log
-          exit 1
-        fi
+        buildozer android debug
         
     - name: Upload APK
       if: success()
       uses: actions/upload-artifact@v4
       with:
-        name: telegram-bot-apk
+        name: telegram-app
         path: bin/*.apk
-        retention-days: 90
-        
-    - name: Upload logs
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-logs
-        path: |
-          build.log
-          update.log
-        retention-days: 30
