@@ -1,4 +1,4 @@
-name: Build APK
+name: Build APK Debug
 
 on: [workflow_dispatch]
 
@@ -9,21 +9,30 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Setup environment
+    - name: Install
       env:
         DEBIAN_FRONTEND: noninteractive
-        TZ: UTC
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3 python3-pip python3-venv openjdk-17-jdk-headless
+        sudo apt-get install -y python3 python3-pip openjdk-17-jdk-headless
         pip3 install buildozer cython
         
-    - name: Build
+    - name: Build and capture errors
       run: |
-        echo y | buildozer android debug
+        # ساخت و ذخیره خروجی
+        echo y | buildozer android debug 2>&1 | tee output.txt
         
-    - name: Upload
+        # استخراج آخرین خطوط در صورت خطا
+        if [ $? -ne 0 ]; then
+          echo "=== LAST 100 LINES ==="
+          tail -100 output.txt
+          echo "=== ERRORS ==="
+          grep -i "error\|failed\|exception" output.txt | tail -20
+          exit 1
+        fi
+        
+    - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: telegram-app
+        name: app
         path: bin/*.apk
