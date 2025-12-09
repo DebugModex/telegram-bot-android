@@ -1,0 +1,63 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:  # اجازه اجرای دستی
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 🐍 Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: 📦 Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          git \
+          zip \
+          unzip \
+          openjdk-17-jdk \
+          python3-pip \
+          python3-setuptools
+        
+    - name: 🔧 Install Buildozer
+      run: |
+        pip install --upgrade pip
+        pip install buildozer cython==0.29.36
+        
+    - name: 🏗️ Build APK
+      run: |
+        echo "Starting APK build..."
+        buildozer android debug 2>&1 | tee build.log
+        
+        # Check if APK was created
+        if ls bin/*.apk 1> /dev/null 2>&1; then
+          echo "✅ APK build successful!"
+        else
+          echo "❌ APK build failed!"
+          cat build.log
+          exit 1
+        fi
+        
+    - name: 📤 Upload APK artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: telegram-bot-apk
+        path: bin/*.apk
+        retention-days: 90
+        
+    - name: 📋 Upload build log
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: build-logs
+        path: build.log
