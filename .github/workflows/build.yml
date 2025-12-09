@@ -5,70 +5,53 @@ on: [workflow_dispatch]
 jobs:
   build:
     runs-on: ubuntu-22.04
-    timeout-minutes: 90
-    
+
     steps:
     - uses: actions/checkout@v4
-    
-    - name: Cache Android SDK/NDK
-      uses: actions/cache@v3
-      id: cache
-      with:
-        path: |
-          ~/.buildozer
-          ~/.android
-          ~/.gradle
-        key: ${{ runner.os }}-android-sdk-${{ hashFiles('buildozer.spec') }}
-        restore-keys: |
-          ${{ runner.os }}-android-sdk-
-    
-    - name: Setup environment
-      env:
-        DEBIAN_FRONTEND: noninteractive
-        TZ: UTC
+
+    - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3 python3-pip openjdk-17-jdk-headless
-        pip3 install buildozer cython
-        
-    - name: Accept Android licenses
+        sudo apt-get install -y python3 python3-pip zip unzip openjdk-17-jdk
+        pip3 install --upgrade pip
+        pip3 install buildozer cython sh jinja2
+
+    - name: Install Android SDK / cmdline-tools
       run: |
-        mkdir -p ~/.android
-        yes | /usr/lib/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
-        
-    - name: Build APK
+        mkdir -p $HOME/android-sdk/cmdline-tools
+        cd $HOME/android-sdk/cmdline-tools
+
+        wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O sdk.zip
+        unzip sdk.zip
+        mv cmdline-tools latest
+
+        export ANDROID_HOME=$HOME/android-sdk
+        export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
+
+        yes | sdkmanager --licenses
+        sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2" "ndk;25.1.8937393"
+
+    - name: Build with Buildozer
+      env:
+        ANDROIDSDK: $HOME/android-sdk
+        ANDROIDNDK: $HOME/android-sdk/ndk/25.1.8937393
+        ANDROID_HOME: $HOME/android-sdk
+        PATH: $HOME/android-sdk/cmdline-tools/latest/bin:$HOME/android-sdk/platform-tools:$PATH
       run: |
-        echo "🚀 Starting build process..."
-        echo "First time: 45-60 minutes"
-        echo "With cache: 10-15 minutes"
-        
         echo y | buildozer android debug
-        
-    - name: Find and prepare APK
+
+    - name: Find and upload APK
       run: |
-        # پیدا کردن APK
-        APK_FILE=$(find . -name "*.apk" -type f | head -1)
-        
-        if [ -z "$APK_FILE" ]; then
-          echo "❌ No APK found. Searching in .buildozer..."
-          APK_FILE=$(find .buildozer -name "*.apk" -type f | head -1)
-        fi
-        
-        if [ -n "$APK_FILE" ]; then
-          echo "✅ APK found: $APK_FILE"
-          # ایجاد پوشه bin و کپی
-          mkdir -p bin
-          cp "$APK_FILE" bin/app-debug.apk
-          echo "Size: $(du -h bin/app-debug.apk | cut -f1)"
-        else
-          echo "❌ ERROR: Build completed but no APK found!"
-          echo "Listing .buildozer directory:"
-          find .buildozer -type f -name "*.apk" 2>/dev/null
+        APK=$(find . -name "*.apk" | head -1)
+        if [ -z "$APK" ]; then
+          echo "APK NOT FOUND!"
           exit 1
         fi
         
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
+        mkdir -p bin
+        cp "$APK" bin/app-debug.apk
+
+    - uses: actions/upload-artifact@v4
       with:
         name: telegram-bot-apk
         path: bin/app-debug.apk
