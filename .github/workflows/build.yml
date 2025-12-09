@@ -1,4 +1,4 @@
-name: Build APK
+name: Build Telegram Bot APK
 
 on: [workflow_dispatch]
 
@@ -9,14 +9,23 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Build APK
+    - name: Build using alternative Docker image
       run: |
-        # ساخت با echo y برای پاسخ خودکار
-        docker run --rm -v $(pwd):/src \
-          kivy/buildozer bash -c "cd /src && echo y | buildozer android debug"
+        # استفاده از image متفاوت که root warning ندارد
+        docker run --rm \
+          -v $(pwd):/src \
+          -e "P4A_RELEASE_KEYSTORE=/src/keystore.keystore" \
+          -e "P4A_RELEASE_KEYALIAS=key" \
+          beevelop/cordova bash -c "
+          cd /src &&
+          apt-get update &&
+          apt-get install -y python3-pip &&
+          pip3 install buildozer &&
+          echo y | buildozer android debug
+          "
           
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: telegram-app
+        name: telegram-bot
         path: bin/*.apk
